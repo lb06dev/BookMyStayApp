@@ -1,61 +1,99 @@
 import java.util.ArrayList;
 import java.util.List;
 
-// Use Case 8: Booking History & Reporting
-// Represents a confirmed reservation
-class Reservation {
-    private String bookingId;
-    private String guestName;
+// 1. Custom Exceptions for explicit error handling
+class BookingException extends Exception {
+    public BookingException(String message) {
+        super(message);
+    }
+}
+
+class Room {
     private String roomType;
+    private int inventory;
 
-    public Reservation(String bookingId, String guestName, String roomType) {
-        this.bookingId = bookingId;
-        this.guestName = guestName;
+    public Room(String roomType, int inventory) {
         this.roomType = roomType;
+        this.inventory = inventory;
     }
 
-    @Override
-    public String toString() {
-        return "Booking ID: " + bookingId + " | Guest: " + guestName + " | Room: " + roomType;
-    }
-}
+    public String getRoomType() { return roomType; }
+    public int getInventory() { return inventory; }
 
-// Booking History Component
-class BookingHistory {
-    // List preserves insertion order, suitable for chronological records
-    private List<Reservation> history = new ArrayList<>();
-
-    public void addReservation(Reservation res) {
-        history.add(res);
-    }
-
-    public List<Reservation> getHistory() {
-        return history;
-    }
-}
-
-// Reporting Service Component
-class BookingReportService {
-    public void generateReport(BookingHistory history) {
-        System.out.println("--- Confirmed Booking Report ---");
-        for (Reservation res : history.getHistory()) {
-            System.out.println(res);
+    // Guarding System State
+    public void bookRoom(int count) throws BookingException {
+        if (count <= 0) {
+            throw new BookingException("Booking count must be positive.");
         }
-        System.out.println("--------------------------------");
+        if (inventory - count < 0) {
+            throw new BookingException("Insufficient inventory for " + roomType);
+        }
+        inventory -= count;
+        System.out.println(count + " " + roomType + "(s) booked successfully.");
+    }
+}
+
+class BookingValidator {
+    public static void validateBooking(String roomType, int count, List<Room> rooms) throws BookingException {
+        // Input Validation
+        if (roomType == null || roomType.isEmpty()) {
+            throw new BookingException("Room type cannot be empty.");
+        }
+
+        Room targetRoom = null;
+        for (Room r : rooms) {
+            if (r.getRoomType().equalsIgnoreCase(roomType)) {
+                targetRoom = r;
+                break;
+            }
+        }
+
+        if (targetRoom == null) {
+            throw new BookingException("Invalid Room Type: " + roomType);
+        }
+
+        // Check Inventory before processing
+        if (targetRoom.getInventory() < count) {
+            throw new BookingException("Requested " + count + " " + roomType + "(s), but only " + targetRoom.getInventory() + " available.");
+        }
     }
 }
 
 public class Main{
     public static void main(String[] args) {
-        BookingHistory bookingHistory = new BookingHistory();
-        BookingReportService reportService = new BookingReportService();
+        List<Room> hotelInventory = new ArrayList<>();
+        hotelInventory.add(new Room("Deluxe", 2));
+        hotelInventory.add(new Room("Suite", 1));
 
-        // Simulated confirmed bookings
-        bookingHistory.addReservation(new Reservation("B001", "Alice", "Deluxe"));
-        bookingHistory.addReservation(new Reservation("B002", "Bob", "Suite"));
-        bookingHistory.addReservation(new Reservation("B003", "Charlie", "Standard"));
+        System.out.println("--- Starting Book My Stay: Use Case 9 ---");
 
-        // Admin reviews booking history
-        reportService.generateReport(bookingHistory);
+        String[][] guestRequests = {
+            {"Deluxe", "1"}, // Valid
+            {"Suite", "1"},  // Valid
+            {"Deluxe", "5"}, // Invalid - Insufficient
+            {"Villa", "1"},  // Invalid - Type
+            {"Suite", "-1"}  // Invalid - Negative
+        };
+
+        for (String[] request : guestRequests) {
+            String roomType = request[0];
+            int count = Integer.parseInt(request[1]);
+            
+            try {
+                System.out.println("\nProcessing: " + roomType + " x" + count);
+                // Fail-Fast Design: Validate before booking
+                BookingValidator.validateBooking(roomType, count, hotelInventory);
+                
+                // If valid, book
+                for (Room r : hotelInventory) {
+                    if (r.getRoomType().equalsIgnoreCase(roomType)) {
+                        r.bookRoom(count);
+                    }
+                }
+            } catch (BookingException e) {
+                // Graceful Failure Handling
+                System.out.println("Booking Failed: " + e.getMessage());
+            }
+        }
     }
 }
