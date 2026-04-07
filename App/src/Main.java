@@ -1,81 +1,100 @@
-// Abstract class to define common attributes and behavior
-abstract class Room {
-    private String roomType;
-    private int bedCount;
-    private double pricePerNight;
-    // Static representation of availability (true = available, false = booked)
-    protected boolean isAvailable;
+import java.util.*;
 
-    public Room(String roomType, int bedCount, double pricePerNight, boolean isAvailable) {
-        this.roomType = roomType;
-        this.bedCount = bedCount;
-        this.pricePerNight = pricePerNight;
-        this.isAvailable = isAvailable;
+// Domain Model: Represents the details of a Room
+class Room {
+    private String type;
+    private double price;
+    private String amenities;
+
+    public Room(String type, double price, String amenities) {
+        this.type = type;
+        this.price = price;
+        this.amenities = amenities;
     }
 
-    // Abstract method to force specific room behavior
-    public abstract void displayRoomDetails();
-
-    // Getters
-    public String getRoomType() { return roomType; }
-    public int getBedCount() { return bedCount; }
-    public double getPricePerNight() { return pricePerNight; }
-    public boolean isAvailable() { return isAvailable; }
-}
-
-class SingleRoom extends Room {
-    public SingleRoom(boolean isAvailable) {
-        super("Single Room", 1, 100.0, isAvailable);
-    }
+    public String getType() { return type; }
+    public double getPrice() { return price; }
+    public String getAmenities() { return amenities; }
 
     @Override
-    public void displayRoomDetails() {
-        System.out.println(getRoomType() + " | Beds: " + getBedCount() +
-                " | Price: $" + getPricePerNight() +
-                " | Available: " + isAvailable());
+    public String toString() {
+        return String.format("[%s] - Price: $%.2f | Amenities: %s", type, price, amenities);
     }
 }
 
-class DoubleRoom extends Room {
-    public DoubleRoom(boolean isAvailable) {
-        super("Double Room", 2, 180.0, isAvailable);
+// Inventory Layer: Holds the state of available room counts
+class Inventory {
+    private Map<String, Integer> availability = new HashMap<>();
+
+    public void addRoomType(String type, int count) {
+        availability.put(type, count);
     }
 
-    @Override
-    public void displayRoomDetails() {
-        System.out.println(getRoomType() + " | Beds: " + getBedCount() +
-                " | Price: $" + getPricePerNight() +
-                " | Available: " + isAvailable());
-    }
-}
-
-class SuiteRoom extends Room {
-    public SuiteRoom(boolean isAvailable) {
-        super("Suite Room", 2, 350.0, isAvailable);
+    // Read-only access to availability
+    public int getAvailableCount(String type) {
+        return availability.getOrDefault(type, 0);
     }
 
-    @Override
-    public void displayRoomDetails() {
-        System.out.println(getRoomType() + " | Beds: " + getBedCount() +
-                " | Price: $" + getPricePerNight() +
-                " | Available: " + isAvailable());
+    public Set<String> getAllRoomTypes() {
+        return availability.keySet();
     }
 }
 
-public class UseCase2RoomInitialization {
+// Search Service: Handles the logic for filtering and displaying rooms
+class SearchService {
+    private Inventory inventory;
+    private List<Room> roomDefinitions;
+
+    public SearchService(Inventory inventory, List<Room> roomDefinitions) {
+        this.inventory = inventory;
+        this.roomDefinitions = roomDefinitions;
+    }
+
+    public void displayAvailableRooms() {
+        System.out.println("--- Searching for Available Rooms ---");
+        boolean found = false;
+
+        for (Room room : roomDefinitions) {
+            // Validation Logic: Retrieve count from inventory (Read-only)
+            int count = inventory.getAvailableCount(room.getType());
+
+            // Defensive Programming: Only display rooms with availability > 0
+            if (count > 0) {
+                System.out.println(room.toString() + " | Rooms Left: " + count);
+                found = true;
+            }
+        }
+
+        if (!found) {
+            System.out.println("Sorry, no rooms are currently available.");
+        }
+        System.out.println("-------------------------------------\n");
+    }
+}
+
+// Main Class to execute Use Case 4
+public class UseCase4RoomSearch {
     public static void main(String[] args) {
-        System.out.println("--- Book My Stay App: Room Inventory ---");
+        // 1. Setup Data (System State)
+        Inventory hotelInventory = new Inventory();
+        hotelInventory.addRoomType("Deluxe", 5);
+        hotelInventory.addRoomType("Suite", 0); // Out of stock
+        hotelInventory.addRoomType("Single", 2);
 
-        // Initialize room objects with static availability
-        Room room1 = new SingleRoom(true);  // Available
-        Room room2 = new DoubleRoom(true);  // Available
-        Room room3 = new SuiteRoom(false);  // Booked
+        List<Room> roomDetails = Arrays.asList(
+                new Room("Deluxe", 150.0, "King Bed, WiFi, Mini Bar"),
+                new Room("Suite", 300.0, "Ocean View, Jacuzzi, Breakfast"),
+                new Room("Single", 80.0, "Twin Bed, WiFi")
+        );
 
-        // Display room details
-        room1.displayRoomDetails();
-        room2.displayRoomDetails();
-        room3.displayRoomDetails();
+        // 2. Initialize Search Service
+        SearchService searchService = new SearchService(hotelInventory, roomDetails);
 
-        System.out.println("----------------------------------------");
+        // 3. Guest performs search
+        // Note: This operation will filter out 'Suite' because availability is 0
+        searchService.displayAvailableRooms();
+
+        // 4. Verification of System State (Read-only check)
+        System.out.println("System Check: Search complete. Inventory state remains unchanged.");
     }
 }
