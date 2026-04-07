@@ -1,68 +1,77 @@
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import java.util.*;
+// 1. Shared Inventory Management with Thread Safety
+class HotelInventory {
+    private AtomicInteger availableRooms;
 
-// Class to handle Booking Cancellation and Inventory Rollback
-class BookingManager {
-    // Inventory count for room type
-    private int availableRooms;
-    // Stack to keep track of recently released Room IDs for LIFO rollback
-    private Stack<String> releasedRoomIds;
-    // Map to simulate database of confirmed bookings (BookingID -> RoomID)
-    private Map<Integer, String> confirmedBookings;
-
-    public BookingManager(int initialInventory) {
-        this.availableRooms = initialInventory;
-        this.releasedRoomIds = new Stack<>();
-        this.confirmedBookings = new HashMap<>();
-        
-        // Pre-populate some bookings for simulation
-        confirmedBookings.put(101, "ROOM_A");
-        confirmedBookings.put(102, "ROOM_B");
+    public HotelInventory(int totalRooms) {
+        this.availableRooms = new AtomicInteger(totalRooms);
     }
 
-    // Use Case 10: Cancel Booking and Rollback Inventory
-    public void cancelBooking(int bookingId) {
-        System.out.println("\n--- Initiating Cancellation for Booking: " + bookingId + " ---");
-
-        // 1. Validation: Check if reservation exists
-        if (!confirmedBookings.containsKey(bookingId)) {
-            System.out.println("Error: Booking " + bookingId + " not found or already cancelled.");
-            return;
+    // Synchronized method to ensure atomic room booking
+    public synchronized boolean bookRoom(String guestName) {
+        if (availableRooms.get() > 0) {
+            // Simulate processing time
+            try { Thread.sleep(50); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            
+            int remaining = availableRooms.decrementAndGet();
+            System.out.println(Thread.currentThread().getName() + " - SUCCESS: Room booked for " + guestName + ". Rooms left: " + remaining);
+            return true;
+        } else {
+            System.out.println(Thread.currentThread().getName() + " - FAILED: No rooms left for " + guestName);
+            return false;
         }
-
-        // 2. Retrieve allocated room
-        String roomId = confirmedBookings.get(bookingId);
-        System.out.println("Allocated Room found: " + roomId);
-
-        // 3. Rollback Structure: Track released room
-        releasedRoomIds.push(roomId);
-        System.out.println("Room " + roomId + " added to rollback stack.");
-
-        // 4. Inventory Restoration: Increment count
-        availableRooms++;
-        System.out.println("Inventory restored. Current available rooms: " + availableRooms);
-
-        // 5. Update History: Remove from confirmed bookings
-        confirmedBookings.remove(bookingId);
-        System.out.println("Booking " + bookingId + " cancelled successfully.");
     }
 
-    public void displayState() {
-        System.out.println("\n[System State] Available Rooms: " + availableRooms + ", Confirmed Bookings: " + confirmedBookings.size());
+    public int getAvailableRooms() {
+        return availableRooms.get();
     }
 }
 
+// 2. Runnable Task representing a Booking Request
+class BookingRequest implements Runnable {
+    private HotelInventory inventory;
+    private String guestName;
+
+    public BookingRequest(HotelInventory inventory, String guestName) {
+        this.inventory = inventory;
+        this.guestName = guestName;
+    }
+
+    @Override
+    public void run() {
+        inventory.bookRoom(guestName);
+    }
+}
+
+// 3. Main Simulation Class
 public class Main{
     public static void main(String[] args) {
-        // Initialize with 5 rooms
-        BookingManager manager = new BookingManager(5);
-        manager.displayState();
+        System.out.println("--- Starting Concurrent Booking Simulation ---\n");
+        
+        // Scenario: 10 guests trying to book 5 rooms simultaneously
+        HotelInventory hotel = new HotelInventory(5);
+        ExecutorService executor = Executors.newFixedThreadPool(10);
 
-        // Perform cancellations
-        manager.cancelBooking(101); // Valid cancellation
-        manager.cancelBooking(102); // Valid cancellation
-        manager.cancelBooking(999); // Invalid cancellation
+        for (int i = 1; i <= 10; i++) {
+            Runnable request = new BookingRequest(hotel, "Guest-" + i);
+            executor.execute(request);
+        }
 
-        manager.displayState();
+        // Shut down executor gracefully
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+        }
+
+        System.out.println("\n--- Simulation Finished ---");
+        System.out.println("Final Room Count: " + hotel.getAvailableRooms());
     }
 }
