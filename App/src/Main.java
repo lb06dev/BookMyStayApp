@@ -1,81 +1,123 @@
-// Abstract class to define common attributes and behavior
-abstract class Room {
-    private String roomType;
-    private int bedCount;
-    private double pricePerNight;
-    // Static representation of availability (true = available, false = booked)
-    protected boolean isAvailable;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 
-    public Room(String roomType, int bedCount, double pricePerNight, boolean isAvailable) {
-        this.roomType = roomType;
-        this.bedCount = bedCount;
-        this.pricePerNight = pricePerNight;
-        this.isAvailable = isAvailable;
-    }
+// 1. Mark entities as Serializable to allow file-based storage
+class Booking implements Serializable {
+    private static final long serialVersionUID = 1L;
+    private String bookingId;
+    private String guestName;
 
-    // Abstract method to force specific room behavior
-    public abstract void displayRoomDetails();
-
-    // Getters
-    public String getRoomType() { return roomType; }
-    public int getBedCount() { return bedCount; }
-    public double getPricePerNight() { return pricePerNight; }
-    public boolean isAvailable() { return isAvailable; }
-}
-
-class SingleRoom extends Room {
-    public SingleRoom(boolean isAvailable) {
-        super("Single Room", 1, 100.0, isAvailable);
+    public Booking(String bookingId, String guestName) {
+        this.bookingId = bookingId;
+        this.guestName = guestName;
     }
 
     @Override
-    public void displayRoomDetails() {
-        System.out.println(getRoomType() + " | Beds: " + getBedCount() +
-                " | Price: $" + getPricePerNight() +
-                " | Available: " + isAvailable());
+    public String toString() {
+        return "Booking[ID=" + bookingId + ", Guest=" + guestName + "]";
     }
 }
 
-class DoubleRoom extends Room {
-    public DoubleRoom(boolean isAvailable) {
-        super("Double Room", 2, 180.0, isAvailable);
+class Inventory implements Serializable {
+    private static final long serialVersionUID = 1L;
+    private int availableRooms;
+
+    public Inventory(int availableRooms) {
+        this.availableRooms = availableRooms;
     }
 
+    public void setAvailableRooms(int rooms) { this.availableRooms = rooms; }
+    
     @Override
-    public void displayRoomDetails() {
-        System.out.println(getRoomType() + " | Beds: " + getBedCount() +
-                " | Price: $" + getPricePerNight() +
-                " | Available: " + isAvailable());
+    public String toString() {
+        return "Inventory[Available Rooms=" + availableRooms + "]";
     }
 }
 
-class SuiteRoom extends Room {
-    public SuiteRoom(boolean isAvailable) {
-        super("Suite Room", 2, 350.0, isAvailable);
+// 2. State wrapper to bundle all critical data for persistence
+class SystemState implements Serializable {
+    private static final long serialVersionUID = 1L;
+    private List<Booking> bookings;
+    private Inventory inventory;
+
+    public SystemState(List<Booking> bookings, Inventory inventory) {
+        this.bookings = bookings;
+        this.inventory = inventory;
     }
 
-    @Override
-    public void displayRoomDetails() {
-        System.out.println(getRoomType() + " | Beds: " + getBedCount() +
-                " | Price: $" + getPricePerNight() +
-                " | Available: " + isAvailable());
+    public List<Booking> getBookings() { return bookings; }
+    public Inventory getInventory() { return inventory; }
+}
+
+// 3. Persistence Service to handle Save/Restore operations
+class PersistenceService {
+    private final String FILE_NAME = "system_state.ser";
+
+    public void saveState(List<Booking> bookings, Inventory inventory) {
+        System.out.println("\n[System] Preparing for shutdown. Serializing state...");
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(FILE_NAME))) {
+            SystemState state = new SystemState(bookings, inventory);
+            oos.writeObject(state);
+            System.out.println("[Persistence Service] Data written successfully to " + FILE_NAME);
+        } catch (IOException e) {
+            System.err.println("[Error] Failed to save state: " + e.getMessage());
+        }
+    }
+
+    public SystemState loadState() {
+        System.out.println("\n[System] Restarting. Attempting to restore state...");
+        File file = new File(FILE_NAME);
+        if (!file.exists()) {
+            System.out.println("[Persistence Service] No existing state file found. Starting fresh.");
+            return null;
+        }
+
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(FILE_NAME))) {
+            SystemState state = (SystemState) ois.readObject();
+            System.out.println("[Persistence Service] Data restored successfully.");
+            return state;
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("[Error] Corrupted or incompatible state file. Recovery failed.");
+            return null;
+        }
     }
 }
 
-public class UseCase2RoomInitialization {
+// 4. Main Application Execution
+public class UseCase12DataPersistenceRecovery {
     public static void main(String[] args) {
-        System.out.println("--- Book My Stay App: Room Inventory ---");
+        PersistenceService persistence = new PersistenceService();
+        
+        // --- System Startup / Restore ---
+        SystemState restoredState = persistence.loadState();
+        
+        List<Booking> bookingHistory;
+        Inventory currentInventory;
 
-        // Initialize room objects with static availability
-        Room room1 = new SingleRoom(true);  // Available
-        Room room2 = new DoubleRoom(true);  // Available
-        Room room3 = new SuiteRoom(false);  // Booked
+        if (restoredState != null) {
+            bookingHistory = restoredState.getBookings();
+            currentInventory = restoredState.getInventory();
+        } else {
+            // Initializing with default state if no recovery file exists
+            bookingHistory = new ArrayList<>();
+            currentInventory = new Inventory(10);
+            System.out.println("[System] Initialized with default settings.");
+        }
 
-        // Display room details
-        room1.displayRoomDetails();
-        room2.displayRoomDetails();
-        room3.displayRoomDetails();
+        // Show current status after recovery
+        System.out.println("Current Status: " + currentInventory);
+        System.out.println("Booking Count: " + bookingHistory.size());
 
-        System.out.println("----------------------------------------");
+        // --- Simulate some system activity ---
+        if (bookingHistory.isEmpty()) {
+            System.out.println("\n[Action] Adding a new booking...");
+            bookingHistory.add(new Booking("BK001", "John Doe"));
+            currentInventory.setAvailableRooms(9);
+        }
+
+        // --- System Shutdown / Save ---
+        persistence.saveState(bookingHistory, currentInventory);
+        System.out.println("[System] Application terminated safely.");
     }
 }
