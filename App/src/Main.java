@@ -1,69 +1,51 @@
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.*;
 
-// Reservation class representing a booking request
-class Reservation {
-    private String guestName;
-    private String roomType;
+class Room {
     int roomNumber;
+    boolean isAvailable;
 
-
-    Reservation(String guestName, int roomNumber) {
-        this.guestName = guestName;
+    Room(int roomNumber) {
         this.roomNumber = roomNumber;
-    }
-
-    void confirmReservation() {
-        System.out.println("Reservation Confirmed!");
-        System.out.println("Guest Name: " + guestName);
-        System.out.println("Room Number: " + roomNumber);
-    }
-
-    public Reservation(String guestName, String roomType) {
-        this.guestName = guestName;
-        this.roomType = roomType;
-
-    }
-
-    public String getGuestName() {
-        return guestName;
-    }
-
-    public String getRoomType() {
-        return roomType;
-    }
-
-    @Override
-    public String toString() {
-        return "Guest: " + guestName +
-                ", Room Type: " + roomType;
+        this.isAvailable = true;
     }
 }
 
-public class UC5BookingReq {
+public class main {
+
+    static List<Room> rooms = new ArrayList<>();
+
+    public static void initializeRooms() {
+        for (int i = 1; i <= 10; i++) {
+            rooms.add(new Room(i));
+        }
+    }
+
+    public static Room allocateRoom() {
+        for (Room room : rooms) {
+            if (room.isAvailable) {
+                room.isAvailable = false;
+                return room;
+            }
+        }
+        return null;
+    }
 
     public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        initializeRooms();
 
-        // Booking Request Queue
-        Queue<Reservation> bookingQueue = new LinkedList<>();
+        System.out.print("Enter Guest Name: ");
+        String guestName = sc.nextLine();
 
-        // Simulating booking requests
-        Reservation r1 = new Reservation("Abhi", "Single");
-        Reservation r2 = new Reservation("Subha", "Double");
-        Reservation r3 = new Reservation("Vanmathi", "Suite");
+        Room room = allocateRoom();
 
-        // Adding requests to queue
-        bookingQueue.add(r1);
-        bookingQueue.add(r2);
-        bookingQueue.add(r3);
-
-        System.out.println("Booking Requests Received and Added to Queue:\n");
-
-        // Display queued requests without allocating rooms
-        for (Reservation r : bookingQueue) {
-            System.out.println(r);
+        if (room != null) {
+            Reservation reservation = new Reservation(guestName, room.roomNumber);
+            reservation.confirmReservation();
+        } else {
+            System.out.println("Sorry! No rooms available.");
         }
 
-        System.out.println("\nRequests are stored in FIFO order and waiting for allocation.");
+        sc.close();
     }
 }
