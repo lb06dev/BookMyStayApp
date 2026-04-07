@@ -1,51 +1,98 @@
 import java.util.*;
 
-class Room {
-    int roomNumber;
-    boolean isAvailable;
+// Main App
+public class Main{
 
-    Room(int roomNumber) {
-        this.roomNumber = roomNumber;
-        this.isAvailable = true;
+    public static void main(String[] args) {
+
+        // Sample reservation IDs
+        String reservation1 = "R101";
+        String reservation2 = "R102";
+
+        // Create services
+        Service wifi = new Service("WiFi", 200);
+        Service breakfast = new Service("Breakfast", 500);
+        Service parking = new Service("Parking", 300);
+
+        // Manager
+        ServiceManager manager = new ServiceManager();
+
+        // Guest selects services
+        manager.addService(reservation1, wifi);
+        manager.addService(reservation1, breakfast);
+
+        manager.addService(reservation2, parking);
+        manager.addService(reservation2, wifi);
+
+        // Display services
+        System.out.println("Services for " + reservation1 + ":");
+        manager.displayServices(reservation1);
+
+        System.out.println("Total Add-On Cost: " + manager.calculateTotalCost(reservation1));
+
+        System.out.println("\nServices for " + reservation2 + ":");
+        manager.displayServices(reservation2);
+
+        System.out.println("Total Add-On Cost: " + manager.calculateTotalCost(reservation2));
     }
 }
 
-public class main {
+// Add-On Service Class
+class Service {
+    private String name;
+    private double cost;
 
-    static List<Room> rooms = new ArrayList<>();
+    public Service(String name, double cost) {
+        this.name = name;
+        this.cost = cost;
+    }
 
-    public static void initializeRooms() {
-        for (int i = 1; i <= 10; i++) {
-            rooms.add(new Room(i));
+    public double getCost() {
+        return cost;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+
+// Manager Class
+class ServiceManager {
+
+    // Map: Reservation ID -> List of Services
+    private Map<String, List<Service>> serviceMap = new HashMap<>();
+
+    // Add service to reservation
+    public void addService(String reservationId, Service service) {
+        serviceMap.putIfAbsent(reservationId, new ArrayList<>());
+        serviceMap.get(reservationId).add(service);
+    }
+
+    // Display services
+    public void displayServices(String reservationId) {
+        List<Service> services = serviceMap.get(reservationId);
+
+        if (services == null || services.isEmpty()) {
+            System.out.println("No services selected.");
+            return;
+        }
+
+        for (Service s : services) {
+            System.out.println("- " + s.getName() + " : " + s.getCost());
         }
     }
 
-    public static Room allocateRoom() {
-        for (Room room : rooms) {
-            if (room.isAvailable) {
-                room.isAvailable = false;
-                return room;
+    // Calculate total cost
+    public double calculateTotalCost(String reservationId) {
+        List<Service> services = serviceMap.get(reservationId);
+        double total = 0;
+
+        if (services != null) {
+            for (Service s : services) {
+                total += s.getCost();
             }
         }
-        return null;
-    }
 
-    public static void main(String[] args) {
-        Scanner sc = new Scanner(System.in);
-        initializeRooms();
-
-        System.out.print("Enter Guest Name: ");
-        String guestName = sc.nextLine();
-
-        Room room = allocateRoom();
-
-        if (room != null) {
-            Reservation reservation = new Reservation(guestName, room.roomNumber);
-            reservation.confirmReservation();
-        } else {
-            System.out.println("Sorry! No rooms available.");
-        }
-
-        sc.close();
+        return total;
     }
 }
